@@ -62,10 +62,16 @@ class PhoebeClient:
             args={'twig': twig}
         )
 
-    def get_value(self, uniqueid: str) -> Any:
+    def get_value(self, **kwargs) -> Any:
+        """
+        Get the value of a parameter identified by passed kwargs. Typically,
+        kwargs will contain 'uniqueid' if available, or a full set of tags
+        (qualifier, context, kind, component, ...) that uniquely identify
+        the parameter.
+        """
         return self.phoebe.execute(
             command='get_value',
-            args={'uniqueid': uniqueid}
+            args=kwargs
         )
 
     def set_value(self, value, **kwargs) -> dict[str, Any]:
