@@ -68,10 +68,16 @@ class PhoebeClient:
             args={'uniqueid': uniqueid}
         )
 
-    def set_value(self, uniqueid: str, value) -> dict[str, Any]:
+    def set_value(self, value, **kwargs) -> dict[str, Any]:
+        """
+        Set the value of a parameter identified by passed kwargs. Typically,
+        kwargs will contain 'uniqueid' if available, or a full set of tags
+        (qualifier, context, kind, component, ...) that uniquely identify
+        the parameter.
+        """
         return self.phoebe.execute(
             command='set_value',
-            args={'uniqueid': uniqueid, 'value': value}
+            args={'value': value, **kwargs}
         )
 
     def add_dataset(self, **kwargs) -> dict[str, Any]:
