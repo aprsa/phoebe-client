@@ -17,4 +17,4 @@ try:
             f.write(bundle)
 
 finally:
-    client.close_session()
+    client.end_session()

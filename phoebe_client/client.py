@@ -28,10 +28,9 @@ class PhoebeClient:
     def set_session_id(self, session_id: str):
         self.phoebe.set_session_id(session_id)
 
-    def close_session(self):
-        if self.phoebe.session_id:
-            self.sessions.end_session(self.phoebe.session_id)
-            self.phoebe.set_session_id(None)
+    def end_session(self, session_id: str):
+        self.sessions.end_session(session_id)
+        self.phoebe.set_session_id(None)
 
     def get_sessions(self) -> dict[str, Any]:
         return self.sessions.get_sessions()
@@ -140,4 +139,4 @@ class PhoebeClient:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close_session()
+        self.end_session()

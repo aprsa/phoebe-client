@@ -134,7 +134,7 @@ Server auth: `X-API-Key: <api_key>` (from `config.toml`)
 
 2. **Optional Dependencies**: JWT features require `pyjwt` package. JWT is for UI→Client only; never send it to the server.
 
-3. **Context Manager vs Manual**: `with PhoebeClient()` auto-creates session; plain instantiation requires explicit `start_session()`/`close_session()` calls. See `examples/basic_usage.py` vs `examples/explicit_session.py`.
+3. **Context Manager vs Manual**: `with PhoebeClient()` auto-creates session; plain instantiation requires explicit `start_session()`/`end_session()` calls. See `examples/basic_usage.py` vs `examples/explicit_session.py`.
 
 4. **NumPy Serialization**: Always pass PHOEBE parameters through `make_json_serializable()` before JSON encoding to handle arrays. This happens automatically in `PhoebeAPI.execute()`.
 
