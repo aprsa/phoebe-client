@@ -35,6 +35,14 @@ class PhoebeClient:
     def get_sessions(self) -> dict[str, Any]:
         return self.sessions.get_sessions()
 
+    def set_morphology(self, morphology: str) -> dict[str, Any]:
+        return self.phoebe.execute(
+            command='set_morphology',
+            args={
+                'morphology': morphology
+            }
+        )
+
     def attach_parameters(self, parameters: list[dict[str, Any]]) -> dict[str, Any]:
         response = self.phoebe.execute(
             command='attach_parameters',
@@ -51,7 +59,9 @@ class PhoebeClient:
     def is_parameter_constrained(self, uniqueid: str) -> dict[str, Any]:
         response = self.phoebe.execute(
             command='is_parameter_constrained',
-            args={'uniqueid': uniqueid}
+            args={
+                'uniqueid': uniqueid
+            }
         )
         return response
 
