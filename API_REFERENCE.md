@@ -40,7 +40,7 @@ End the current PHOEBE session and clean up server resources.
 
 **Parameters:** None
 
-**Returns:** `dict` with success status
+**Returns:** `dict` with server response
 
 **Example:**
 ```python
@@ -318,8 +318,7 @@ Execute a forward model computation.
 **Example:**
 ```python
 result = client.run_compute(compute='phoebe01', model='latest')
-if result['success']:
-    print("Computation successful")
+print(f"Result: {result}")
 ```
 
 **Server Command:** `run_compute`
@@ -392,9 +391,8 @@ Save the current Bundle state.
 **Example:**
 ```python
 result = client.save_bundle()
-if result['success']:
-    with open('output.phoebe', 'w') as f:
-        f.write(result['result']['bundle'])
+with open('output.phoebe', 'w') as f:
+    f.write(result['bundle'])
 ```
 
 **Server Command:** `save_bundle`

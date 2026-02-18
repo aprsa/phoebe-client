@@ -1,7 +1,0 @@
-[server]
-host = "localhost"  # hostname or IP address of phoebe-server
-port = 8001         # port where phoebe-server is listening
-timeout = 30        # timeout for server requests in seconds (optional)
-
-[auth]
-api_key = ""  # API key issued by phoebe-server for client->server access

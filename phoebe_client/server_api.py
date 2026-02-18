@@ -1,66 +1,64 @@
 """Server API clients for PHOEBE backend communication.
 
 This module consolidates all HTTP communication with the phoebe-server:
-- BaseAPI: Shared connection plumbing (host/port/timeout, base_url, X-API-Key headers)
-- SessionAPI: Session lifecycle management (start/end sessions, memory/port status)
+- BaseAPI: Shared connection plumbing (host/port/timeout, base_url, Bearer token)
+- SessionAPI: Session lifecycle + auth endpoints (register/login/config)
 - PhoebeAPI: PHOEBE command execution via unified execute() method
 """
 
 import requests
 from typing import Any
 
-from .config import CONFIG, ServerConfig
-from .exceptions import SessionError, CommandError
+from .exceptions import AuthenticationError, SessionError, CommandError
 from .utils.serialization import make_json_serializable
+
+DEFAULT_HOST = 'localhost'
+DEFAULT_PORT = 8001
+DEFAULT_TIMEOUT = 120
 
 
 class BaseAPI:
     """Base class for server API clients.
 
-    Provides common server connection handling (host/port/timeout), base_url property,
-    and headers with X-API-Key from config.toml.
+    Provides common server connection handling (host/port/timeout), base_url,
+    and optional Bearer token header for authenticated requests.
     """
 
-    def __init__(self, host: str | None = None, port: int | None = None, timeout: int | None = None):
-        cfg: ServerConfig = CONFIG.server
-        self._host = host or cfg.host
-        self._port = port or cfg.port
-        self._timeout = timeout or cfg.timeout
-        self._jwt_token: str | None = None  # optional per-request user identity token (not for authorization)
+    def __init__(
+        self,
+        host: str = DEFAULT_HOST,
+        port: int = DEFAULT_PORT,
+        timeout: int = DEFAULT_TIMEOUT,
+    ):
+        self._host = host
+        self._port = port
+        self._timeout = timeout
+        self._token: str | None = None
 
     @property
     def base_url(self) -> str:
-        return f"http://{self._host}:{self._port}"
+        return f'http://{self._host}:{self._port}'
 
-    def set_jwt_token(self, token: str | None) -> None:
-        """Set or clear the JWT used for user identification.
-
-        Note: Server authorization remains based on X-API-Key; JWT is forwarded
-        only for user identification/auditing and optional session tagging.
-        """
-        self._jwt_token = token
+    def set_token(self, token: str | None) -> None:
+        """Set or clear the Bearer token used for authentication."""
+        self._token = token
 
     def _get_headers(self) -> dict[str, str]:
-        headers = {"Content-Type": "application/json"}
-        if CONFIG.auth.api_key:
-            headers["X-API-Key"] = CONFIG.auth.api_key
-        if self._jwt_token:
-            headers["Authorization"] = f"Bearer {self._jwt_token}"
+        headers: dict[str, str] = {'Content-Type': 'application/json'}
+        if self._token:
+            headers['Authorization'] = f'Bearer {self._token}'
         return headers
 
 
 class SessionAPI(BaseAPI):
-    """API client for PHOEBE session management.
+    """API client for PHOEBE session management and authentication.
 
-    Manages backend session lifecycle: start/end sessions, query memory usage,
-    and port status. Uses X-API-Key from config for server authentication.
+    Manages backend session lifecycle (start/end, memory, ports) and
+    authentication (register/login, auth config discovery).
     """
 
-    def __init__(self, host: str | None = None, port: int | None = None, timeout: int | None = None):
-        super().__init__(host=host, port=port, timeout=timeout)
-
     def _request(self, method: str, endpoint: str, **kwargs) -> dict[str, Any]:
-        url = f"{self.base_url}{endpoint}"
+        url = f'{self.base_url}{endpoint}'
         try:
             response = requests.request(
                 method,
@@ -75,37 +73,74 @@ class SessionAPI(BaseAPI):
             status = e.response.status_code if e.response is not None else None
             if status in (401, 403):
                 raise SessionError(
-                    f"Server authentication failed (status {status}). Check API key in config.toml."
+                    f'Server authentication failed (status {status}).'
                 ) from e
-            raise SessionError(f"Request failed: {e}") from e
+            raise SessionError(f'Request failed: {e}') from e
         except requests.RequestException as e:
-            raise SessionError(f"Request failed: {e}") from e
+            raise SessionError(f'Request failed: {e}') from e
+
+    # ---- auth ---------------------------------------------------------
+
+    def get_auth_config(self) -> dict[str, Any]:
+        """Discover the server's auth mode (none/password/jwt/external)."""
+        return self._request('GET', '/auth/config')
+
+    def register(self, email: str, password: str, first_name: str = "", last_name: str = "") -> dict[str, Any]:
+        """Register a new user (password mode only). Returns {access_token, token_type}."""
+        try:
+            result = self._request(
+                'POST',
+                '/auth/register',
+                json={
+                    'email': email,
+                    'password': password,
+                    'first_name': first_name,
+                    'last_name': last_name,
+                },
+            )
+            # Auto-set token on success
+            token = result.get('access_token')
+            if token:
+                self.set_token(token)
+            return result
+        except SessionError as e:
+            raise AuthenticationError(str(e)) from e
+
+    def login(self, email: str, password: str) -> dict[str, Any]:
+        """Log in (password mode only). Returns {access_token, token_type}."""
+        try:
+            result = self._request(
+                'POST',
+                '/auth/login',
+                json={'email': email, 'password': password},
+            )
+            token = result.get('access_token')
+            if token:
+                self.set_token(token)
+            return result
+        except SessionError as e:
+            raise AuthenticationError(str(e)) from e
+
+    def get_me(self) -> dict[str, Any]:
+        """Get the current authenticated user's info."""
+        return self._request('GET', '/auth/me')
+
+    # ---- sessions -----------------------------------------------------
 
     def get_sessions(self) -> dict[str, Any]:
-        return self._request("GET", "/dash/sessions")
+        return self._request('GET', '/dash/sessions')
 
     def start_session(self, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
-        return self._request(
-            'POST',
-            '/dash/start-session',
-            json=metadata
-        )
+        return self._request('POST', '/dash/start-session', json=metadata)
 
     def end_session(self, session_id: str) -> dict[str, Any]:
-        return self._request("POST", f"/dash/end-session/{session_id}")
-
-    def update_user_info(self, session_id: str, first_name: str, last_name: str):
-        return self._request(
-            "POST",
-            f"/dash/update-user-info/{session_id}",
-            json={"first_name": first_name, "last_name": last_name},
-        )
+        return self._request('POST', f'/dash/end-session/{session_id}')
 
     def get_memory_usage(self) -> dict[str, Any]:
-        return self._request("GET", "/dash/session-memory")
+        return self._request('GET', '/dash/session-memory')
 
     def get_port_status(self) -> dict[str, Any]:
-        return self._request("GET", "/dash/port-status")
+        return self._request('GET', '/dash/port-status')
 
 
 class PhoebeAPI(BaseAPI):
@@ -118,9 +153,9 @@ class PhoebeAPI(BaseAPI):
 
     def __init__(
         self,
-        host: str | None = None,
-        port: int | None = None,
-        timeout: int | None = None,
+        host: str = DEFAULT_HOST,
+        port: int = DEFAULT_PORT,
+        timeout: int = DEFAULT_TIMEOUT,
         session_id: str | None = None,
     ):
         super().__init__(host=host, port=port, timeout=timeout)
@@ -148,7 +183,7 @@ class PhoebeAPI(BaseAPI):
             status = e.response.status_code if e.response is not None else None
             if status in (401, 403):
                 raise CommandError(
-                    f'Server authentication failed (status {status}). Check API key in config.toml.'
+                    f'Server authentication failed (status {status}).'
                 ) from e
             raise CommandError(f'Command failed: {e}') from e
         except requests.RequestException as e:
