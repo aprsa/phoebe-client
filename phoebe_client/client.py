@@ -84,6 +84,10 @@ class PhoebeClient:
     def get_sessions(self) -> dict[str, Any]:
         return self.sessions.get_sessions()
 
+    def get_passbands(self) -> dict[str, Any]:
+        """Get installed passbands from server."""
+        return self.sessions.get_passbands()
+
     # ---- PHOEBE operations -------------------------------------------
 
     def set_morphology(self, morphology: str) -> dict[str, Any]:

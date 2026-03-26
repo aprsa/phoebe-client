@@ -142,6 +142,10 @@ class SessionAPI(BaseAPI):
     def get_port_status(self) -> dict[str, Any]:
         return self._request('GET', '/dash/port-status')
 
+    def get_passbands(self) -> dict[str, Any]:
+        """Fetch installed passbands from server system endpoint."""
+        return self._request('GET', '/system/passbands')
+
 
 class PhoebeAPI(BaseAPI):
     """API client for PHOEBE parameter operations.
